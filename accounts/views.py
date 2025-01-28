@@ -1,6 +1,6 @@
 from django.shortcuts import render ,redirect
 from rest_framework.views import APIView
-from .serializers import RegistraionSerializer, UserLoginSerializers
+from .serializers import RegistraionSerializer, UserLoginSerializers , InstructorSerialisers ,StudentSerialisers
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -16,6 +16,11 @@ from django.utils.encoding import force_bytes
 from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 
+from rest_framework import viewsets
+
+from rest_framework.decorators import action
+
+
 class RegistrationView(APIView):
     serializer_class = RegistraionSerializer
     def post(self,request):
@@ -26,9 +31,20 @@ class RegistrationView(APIView):
             email = form._validated_data['email']
             role = form._validated_data['role']
             user = User.objects.create_user(is_active=False,username=username,email=email,password=password)  
- 
+            user.first_name = form._validated_data['first_name']
+            user.last_name = form._validated_data['last_name']
+            
             if role in ['Student','Instructor']:
                 user.groups.add(Group.objects.get(name=role))   
+                if role is 'Student':
+                    profile = Student.objects.create(user=user)
+                else:
+                    profile = Instructor.objects.create(user=user)
+
+            profile.phone = form._validated_data['phone']
+            profile.address = form._validated_data['address']
+            profile.save()
+
 
             token = default_token_generator.make_token(user)
             print(token)
@@ -64,6 +80,9 @@ def activate(request,uid64,token):
 
     return render(request,"failed_email.html",{})
 
+
+from django.middleware.csrf import get_token
+
 class LoginView(APIView):
     def post(self,request):
         serializer = UserLoginSerializers(data=self.request.data)
@@ -72,7 +91,10 @@ class LoginView(APIView):
             if user:
                 token , _ = Token.objects.get_or_create(user=user)
                 login(request,user)
-                return Response({"token":token.key,"user_id":user.id,})
+                 # Set the CSRF token in the response
+                csrf_token = get_token(request)
+
+                return Response({"token":token.key,"user_id":user.id,"csrfToken": csrf_token,})
             else:
                 return Response({"error":"Invalid Credential"})
         return Response(serializer.errors)
@@ -80,10 +102,71 @@ class LoginView(APIView):
 
 class LogoutView(APIView):
     def get(self, request): 
+        print(request.user.username) 
         try:   
             token = Token.objects.get(user=User.objects.get(id=request.user.id))
             token.delete() 
             logout(request) 
-            return Response({"message": "Token deleted successfully, user logged out."}, status=status.HTTP_200_OK)
+            return Response({"message": "Successfully Logout and Token deleted!"}, status=status.HTTP_200_OK)
         except Token.DoesNotExist:
             return Response({"error": "Invalid token or token does not exist."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class InstructorView(viewsets.ModelViewSet):  
+    serializer_class = InstructorSerialisers
+
+    def get_queryset(self): 
+        group = Group.objects.get(name="Instructor") 
+        return User.objects.filter(groups=group)
+
+    @action(detail=True,methods=['put'],url_path='update')
+    def update_profile(self,request,pk=None):
+        try:  
+            user = User.objects.get(pk=pk) 
+            profile = Instructor.objects.get(user=user)
+            
+            user.first_name = request.data.get('first_name', user.first_name) 
+
+            user.last_name = request.data.get('last_name', user.last_name) 
+            user.email = request.data.get('email', user.email)
+            user.save() 
+ 
+            profile.image = request.data.get('image', profile.image)
+            profile.bio = request.data.get('bio', profile.bio)
+            profile.phone = request.data.get('phone', profile.phone)
+            profile.address = request.data.get('address', profile.address)
+            profile.save() 
+ 
+            return Response({'messages':"Successfully updated "},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_501_NOT_IMPLEMENTED)
+    
+
+class StudentView(viewsets.ModelViewSet):  
+    serializer_class = StudentSerialisers
+
+    def get_queryset(self): 
+        group = Group.objects.get(name="Student") 
+        return User.objects.filter(groups=group)
+     
+    @action(detail=True,methods=['put'],url_path='update')
+    def update_profile(self,request,pk=None):
+        try:  
+            user = User.objects.get(pk=pk) 
+            profile = Student.objects.get(user=user)
+            
+            user.first_name = request.data.get('first_name', user.first_name) 
+
+            user.last_name = request.data.get('last_name', user.last_name) 
+            user.email = request.data.get('email', user.email)
+            user.save() 
+ 
+            profile.image = request.data.get('image', profile.image)
+            profile.bio = request.data.get('bio', profile.bio)
+            profile.phone = request.data.get('phone', profile.phone)
+            profile.address = request.data.get('address', profile.address)
+            profile.save() 
+ 
+            return Response({'messages':"Successfully updated "},status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_501_NOT_IMPLEMENTED)

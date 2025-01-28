@@ -25,7 +25,30 @@ SECRET_KEY = 'django-insecure-u*bghau#l_ff%#-f#@i#udg*1z136hv5we8!_%lqipg+_&7%oi
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1", ".vercel.app", ".now.sh"]
+CORS_ALLOW_ALL_ORIGINS = True 
+
+
+
+# ------
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:5501",  # Frontend URL
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:5501",
+]
+ 
+# Enable session-based authentication
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
+
+# Configure cookie settings
+SESSION_COOKIE_NAME = 'sessionid'  # Default cookie name is 'sessionid'
+SESSION_COOKIE_HTTPONLY = True      # This prevents JavaScript from accessing the cookie directly
+SESSION_COOKIE_SAMESITE = 'Lax'    # or 'None' for cross-site requests (if using different domains/ports)
+SESSION_COOKIE_SECURE = False      # Set to True if using HTTPS in production
+
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'  # For Gmail
@@ -36,6 +59,13 @@ EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
 # Application definition
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
+}
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -44,15 +74,21 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework.authtoken',
+    'rest_framework',
+    'django_filters',
     'core',
     'accounts',
-    'rest_framework',
+    'courses',
+    'corsheaders',
     
 ] 
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  
+
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
